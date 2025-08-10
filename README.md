@@ -152,6 +152,9 @@ This approach can extract hundreds of entities from full novels while maintainin
 
 ```bash
 pip install langextract
+
+# Or with Gradio web interface support
+pip install "langextract[gradio]"
 ```
 
 *Recommended for most users. For isolated environments, consider using a virtual environment:*
@@ -294,6 +297,36 @@ result = lx.extract(
 **Quick setup:** Install Ollama from [ollama.com](https://ollama.com/), run `ollama pull gemma2:2b`, then `ollama serve`.
 
 For detailed installation, Docker setup, and examples, see [`examples/ollama/`](examples/ollama/).
+
+## 🌐 Gradio Web Interface
+
+LangExtract includes a user-friendly web interface built with Gradio for interactive text extraction:
+
+```bash
+# Install with Gradio support
+pip install "langextract[gradio]"
+
+# Launch the web interface
+python launch_gradio.py
+```
+
+Visit `http://localhost:7860` to access the interactive interface featuring:
+
+- **📝 Interactive Text Input**: Paste or upload text for extraction
+- **🎯 Example-Guided Prompting**: Built-in templates for common tasks
+- **⚙️ Model Configuration**: Easy API key setup and parameter tuning
+- **📊 Real-time Visualization**: See extracted entities highlighted in context
+- **🔄 Multi-model Support**: Works with Gemini, OpenAI, and local Ollama models
+
+**Quick Start with Gradio:**
+```python
+from gradio_app import create_gradio_interface
+
+interface = create_gradio_interface()
+interface.launch()
+```
+
+For detailed instructions, see [`GRADIO_README.md`](GRADIO_README.md).
 
 ## More Examples
 
