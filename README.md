@@ -10,8 +10,36 @@
 [![GitHub stars](https://img.shields.io/github/stars/google/langextract.svg?style=social&label=Star)](https://github.com/google/langextract)
 ![Tests](https://github.com/google/langextract/actions/workflows/ci.yaml/badge.svg)
 
+## 🌐 Gradio Web Interface
+
+Experience LangExtract through an intuitive web interface! Our Gradio-powered UI makes structured information extraction accessible to everyone.
+
+<p align="center">
+  <img src="docs/ui-screenshot/ui1.png" alt="LangExtract Gradio Interface - Main View" width="800"/>
+  <br><em>Main extraction interface with example templates</em>
+</p>
+
+<p align="center">
+  <img src="docs/ui-screenshot/ui2.png" alt="LangExtract Gradio Interface - Model Settings" width="800"/>
+  <br><em>Model configuration with Ollama support</em>
+</p>
+
+<p align="center">
+  <img src="docs/ui-screenshot/ui3.png" alt="LangExtract Gradio Interface - Results" width="800"/>
+  <br><em>Interactive visualization of extracted data</em>
+</p>
+
+**✨ Key Features:**
+- 🎯 **Drag & Drop**: Upload PDFs, DOCX, and text files
+- 🤖 **Multi-Model**: Support for Gemini, OpenAI, and 20+ Ollama models  
+- 🔒 **Privacy-First**: Use local Ollama models for complete data privacy
+- 📊 **Interactive Visualization**: Real-time extraction results
+- 📁 **Document Processing**: Automatic text extraction from various formats
+
+
 ## Table of Contents
 
+- [🌐 Gradio Web Interface](#-gradio-web-interface)
 - [Introduction](#introduction)
 - [Why LangExtract?](#why-langextract)
 - [Quick Start](#quick-start)
@@ -298,35 +326,7 @@ result = lx.extract(
 
 For detailed installation, Docker setup, and examples, see [`examples/ollama/`](examples/ollama/).
 
-## 🌐 Gradio Web Interface
-
-LangExtract includes a user-friendly web interface built with Gradio for interactive text extraction:
-
-```bash
-# Install with Gradio support
-pip install "langextract[gradio]"
-
-# Launch the web interface
-python launch_gradio.py
-```
-
-Visit `http://localhost:7860` to access the interactive interface featuring:
-
-- **📝 Interactive Text Input**: Paste or upload text for extraction
-- **🎯 Example-Guided Prompting**: Built-in templates for common tasks
-- **⚙️ Model Configuration**: Easy API key setup and parameter tuning
-- **📊 Real-time Visualization**: See extracted entities highlighted in context
-- **🔄 Multi-model Support**: Works with Gemini, OpenAI, and local Ollama models
-
-**Quick Start with Gradio:**
-```python
-from gradio_app import create_gradio_interface
-
-interface = create_gradio_interface()
-interface.launch()
-```
-
-For detailed instructions, see [`GRADIO_README.md`](GRADIO_README.md).
+**💡 Want to try the visual interface?** See the [🌐 Gradio Web Interface](#-gradio-web-interface) section at the top for screenshots and setup instructions!
 
 ## More Examples
 
