@@ -155,19 +155,19 @@ def run_extraction(
 
         # Detect if this is an Ollama model (local model)
         ollama_patterns = [
-            'gemma', 'llama', 'mistral', 'mixtral', 'phi', 'qwen', 
-            'deepseek', 'command-r', 'starcoder', 'codellama', 
+            'gemma', 'llama', 'mistral', 'mixtral', 'phi', 'qwen',
+            'deepseek', 'command-r', 'starcoder', 'codellama',
             'codegemma', 'tinyllama', 'wizardcoder'
         ]
         is_ollama_model = any(pattern in model_id.lower() for pattern in ollama_patterns)
-        
+
         # Set API key for cloud models
         if not is_ollama_model:
             if api_key and api_key.strip():
                 os.environ['LANGEXTRACT_API_KEY'] = api_key.strip()
             elif 'LANGEXTRACT_API_KEY' not in os.environ:
                 return "Error: Please provide an API key for cloud models (Gemini/OpenAI) or use a local Ollama model", "", ""
-        
+
         # Set model URL for Ollama models
         if is_ollama_model and (not model_url or not model_url.strip()):
             model_url = "http://localhost:11434"
@@ -184,7 +184,7 @@ def run_extraction(
             "max_workers": max_workers,
             "debug": True
         }
-        
+
         if is_ollama_model:
             # Ollama-specific settings
             extract_kwargs.update({
@@ -198,14 +198,14 @@ def run_extraction(
                 "use_schema_constraints": use_schema_constraints,
                 "fence_output": fence_output
             })
-            
+
             # OpenAI models need specific settings
             if model_id.startswith('gpt-'):
                 extract_kwargs.update({
                     "fence_output": True,
                     "use_schema_constraints": False
                 })
-        
+
         # Run extraction
         result = lx.extract(**extract_kwargs)
 
@@ -299,7 +299,7 @@ def extract_text_from_pdf(file_path: str) -> str:
     """Extract text from a PDF file."""
     if not PDF_SUPPORT:
         raise ImportError("pypdf library not installed. Install with: pip install pypdf")
-    
+
     try:
         with open(file_path, 'rb') as file:
             pdf_reader = pypdf.PdfReader(file)
@@ -308,10 +308,10 @@ def extract_text_from_pdf(file_path: str) -> str:
                 page_text = page.extract_text()
                 if page_text:
                     text += page_text + "\n"
-        
+
         if not text.strip():
             return "Error: Could not extract text from PDF. The PDF might be image-based or protected."
-        
+
         return text.strip()
     except Exception as e:
         return f"Error reading PDF: {str(e)}"
@@ -321,16 +321,16 @@ def extract_text_from_docx(file_path: str) -> str:
     """Extract text from a Word document."""
     if not DOCX_SUPPORT:
         raise ImportError("python-docx library not installed. Install with: pip install python-docx")
-    
+
     try:
         doc = docx.Document(file_path)
         text = ""
         for paragraph in doc.paragraphs:
             text += paragraph.text + "\n"
-        
+
         if not text.strip():
             return "Error: Could not extract text from Word document."
-        
+
         return text.strip()
     except Exception as e:
         return f"Error reading Word document: {str(e)}"
@@ -340,9 +340,9 @@ def extract_text_from_file(file_path: str) -> str:
     """Extract text from various file formats."""
     if not file_path:
         return "Error: No file provided"
-    
+
     file_ext = os.path.splitext(file_path)[1].lower()
-    
+
     try:
         if file_ext == '.pdf':
             return extract_text_from_pdf(file_path)
@@ -363,31 +363,31 @@ def process_uploaded_file(file) -> tuple[str, str]:
     """Process uploaded file and extract text."""
     if file is None:
         return "", "No file uploaded"
-    
+
     try:
         # Get file information
         file_path = file.name
         file_name = os.path.basename(file_path)
         file_size = os.path.getsize(file_path)
-        
+
         # Check file size (limit to 10MB)
         if file_size > 10 * 1024 * 1024:
             return "", f"Error: File '{file_name}' is too large. Maximum size is 10MB."
-        
+
         # Extract text
         extracted_text = extract_text_from_file(file_path)
-        
+
         if extracted_text.startswith("Error:"):
             return "", extracted_text
-        
+
         # Success message
         status_msg = f"✅ Successfully extracted text from '{file_name}'\n"
         status_msg += f"📄 File size: {file_size:,} bytes\n"
         status_msg += f"📝 Text length: {len(extracted_text):,} characters\n"
         status_msg += f"📊 Word count: {len(extracted_text.split()):,} words"
-        
+
         return extracted_text, status_msg
-        
+
     except Exception as e:
         return "", f"Error processing file: {str(e)}"
 
@@ -396,24 +396,24 @@ def test_ollama_connection(model_url: str) -> str:
     """Test connection to Ollama server and return status."""
     if not model_url or not model_url.strip():
         model_url = "http://localhost:11434"
-    
+
     try:
         # Test basic connection
         response = requests.get(f"{model_url.strip()}/api/version", timeout=5)
         if response.status_code == 200:
             version_info = response.json()
-            
+
             # Try to list available models
             models_response = requests.get(f"{model_url.strip()}/api/tags", timeout=5)
             if models_response.status_code == 200:
                 models_data = models_response.json()
                 models = [model['name'] for model in models_data.get('models', [])]
-                
+
                 if models:
                     available_models = ', '.join(models[:5])  # Show first 5 models
                     if len(models) > 5:
                         available_models += f" (and {len(models)-5} more)"
-                    
+
                     return f"✅ Ollama server connected!\n" \
                            f"Version: {version_info.get('version', 'unknown')}\n" \
                            f"Available models: {available_models}\n" \
@@ -429,7 +429,7 @@ def test_ollama_connection(model_url: str) -> str:
         else:
             return f"❌ Ollama server responded with error: {response.status_code}\n" \
                    f"Server URL: {model_url.strip()}"
-            
+
     except requests.exceptions.ConnectionError:
         return f"❌ Cannot connect to Ollama server.\n" \
                f"Make sure Ollama is running: ollama serve\n" \
@@ -487,7 +487,7 @@ def create_gradio_interface():
             with gr.Row():
                 with gr.Column(scale=2):
                     gr.Markdown("### Input Text")
-                    
+
                     # File upload section
                     with gr.Row():
                         file_upload = gr.File(
@@ -495,14 +495,14 @@ def create_gradio_interface():
                             file_types=[".pdf", ".docx", ".txt", ".md"],
                             type="filepath"
                         )
-                        
+
                     upload_status = gr.Textbox(
                         label="Upload Status",
                         lines=3,
                         interactive=False,
                         visible=False
                     )
-                    
+
                     input_text = gr.Textbox(
                         label="Text to Extract From",
                         placeholder="Enter text manually or upload a document above...",
@@ -548,14 +548,14 @@ Extractions:
                         choices=[
                             # Cloud models (require API key)
                             "gemini-2.5-flash",
-                            "gemini-2.5-pro", 
+                            "gemini-2.5-pro",
                             "gemini-1.5-flash",
                             "gemini-1.5-pro",
                             "gpt-4o",
                             "gpt-4o-mini",
                             # Local Ollama models (no API key needed)
                             "gemma2:2b",
-                            "gemma2:9b", 
+                            "gemma2:9b",
                             "gemma2:27b",
                             "llama3.2:1b",
                             "llama3.2:3b",
@@ -582,7 +582,7 @@ Extractions:
                         type="password",
                         info="Get API keys from AI Studio (Gemini) or OpenAI Platform. Leave empty for Ollama."
                     )
-                    
+
                     with gr.Row():
                         model_url = gr.Textbox(
                             label="Ollama Server URL (for local models)",
@@ -592,7 +592,7 @@ Extractions:
                             scale=3
                         )
                         test_ollama_btn = gr.Button("🔍 Test Ollama", scale=1, size="sm")
-                    
+
                     ollama_status = gr.Textbox(
                         label="Ollama Status",
                         lines=4,
@@ -688,13 +688,13 @@ Extractions:
 
                         ### 1. Input Text
             You can provide text in two ways:
-            
+
             **📁 Upload Documents:**
             - **PDF files** (.pdf) - Automatic text extraction
-            - **Word documents** (.docx) - Full text extraction  
+            - **Word documents** (.docx) - Full text extraction
             - **Text files** (.txt, .md) - Direct import
             - **Size limit**: 10MB maximum
-            
+
             **✏️ Manual Entry:**
             - Paste or type text directly
             - Clinical notes or medical reports
@@ -737,7 +737,7 @@ Extractions:
             - Smaller chunks (max_char_buffer) often give better accuracy
 
             ## Model Comparison
-            
+
             ### ☁️ Cloud Models (Require API Key)
             | Model | Best For | Provider | Notes |
             |-------|----------|----------|-------|
@@ -745,7 +745,7 @@ Extractions:
             | gemini-2.5-pro | Complex reasoning | Google AI | Best for difficult tasks |
             | gpt-4o | OpenAI ecosystem | OpenAI | Requires fence_output=True |
             | gpt-4o-mini | Cost efficiency | OpenAI | Faster, cheaper GPT |
-            
+
             ### 🌐 Local Models (No API Key - Ollama)
             | Model | Size | Best For | Memory |
             |-------|------|----------|--------|
@@ -759,42 +759,42 @@ Extractions:
             | qwen2.5:7b | 7B | Code + Text | 5-7 GB |
             | codellama:7b | 7B | Code generation | 5-7 GB |
             | tinyllama:1.1b | 1B | Minimal resources | 1 GB |
-            
+
             ## 🚀 Ollama Setup Guide
-            
+
             ### Quick Setup
             ```bash
             # 1. Install Ollama
             curl -fsSL https://ollama.com/install.sh | sh
-            
+
             # 2. Start Ollama server
             ollama serve
-            
+
             # 3. Pull a model (in another terminal)
             ollama pull gemma2:2b
-            
+
             # 4. Test in LangExtract Gradio
             # Select "gemma2:2b" model and run extraction!
             ```
-            
+
             ### Popular Model Downloads
             ```bash
             # Small models (good for testing)
             ollama pull tinyllama:1.1b      # 637 MB
             ollama pull gemma2:2b           # 1.6 GB
             ollama pull llama3.2:1b         # 1.3 GB
-            
+
             # Medium models (balanced)
             ollama pull llama3.2:3b         # 2.0 GB
             ollama pull phi3:mini           # 2.3 GB
             ollama pull gemma2:9b           # 5.5 GB
-            
+
             # Large models (best quality)
             ollama pull llama3.1:8b         # 4.7 GB
             ollama pull mistral:7b          # 4.1 GB
             ollama pull qwen2.5:7b          # 4.5 GB
             ```
-            
+
             ### Ollama Configuration
             - **Default URL**: `http://localhost:11434`
             - **No API Key Required**: Just select an Ollama model
@@ -807,41 +807,41 @@ Extractions:
             fn=get_example_romeo_juliet,
             outputs=examples_text
         )
-        
+
         example_medical_btn.click(
             fn=get_example_medical,
             outputs=examples_text
         )
-        
+
         example_business_btn.click(
             fn=get_example_business,
             outputs=examples_text
         )
-        
+
         def test_and_show_ollama(url):
             """Test Ollama and return status with visibility."""
             status = test_ollama_connection(url)
             return status, gr.update(visible=True)
-        
+
         def handle_file_upload(file):
             """Handle file upload and extract text."""
             if file is None:
                 return "", gr.update(visible=False)
-            
+
             extracted_text, status_msg = process_uploaded_file(file)
-            
+
             if status_msg.startswith("Error:"):
                 return "", gr.update(value=status_msg, visible=True)
             else:
                 return extracted_text, gr.update(value=status_msg, visible=True)
-        
+
         # Event handlers
         file_upload.change(
             fn=handle_file_upload,
             inputs=file_upload,
             outputs=[input_text, upload_status]
         )
-        
+
         test_ollama_btn.click(
             fn=test_and_show_ollama,
             inputs=model_url,
@@ -882,6 +882,7 @@ def main():
         server_port=7860,
         share=False,  # Set to True to create a public link
         debug=True,
+        inbrowser=True,
         show_error=True
     )
 
