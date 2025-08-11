@@ -137,13 +137,13 @@ def run_extraction(
 ) -> Tuple[str, str, str]:
     """Run the extraction and return results."""
 
-    if not input_text.strip():
+    if not input_text or not input_text.strip():
         return "Error: Please provide input text", "", ""
 
-    if not prompt_description.strip():
+    if not prompt_description or not prompt_description.strip():
         return "Error: Please provide a prompt description", "", ""
 
-    if not examples_text.strip():
+    if not examples_text or not examples_text.strip():
         return "Error: Please provide at least one example", "", ""
 
     try:
@@ -163,13 +163,13 @@ def run_extraction(
         
         # Set API key for cloud models
         if not is_ollama_model:
-            if api_key.strip():
+            if api_key and api_key.strip():
                 os.environ['LANGEXTRACT_API_KEY'] = api_key.strip()
             elif 'LANGEXTRACT_API_KEY' not in os.environ:
                 return "Error: Please provide an API key for cloud models (Gemini/OpenAI) or use a local Ollama model", "", ""
         
         # Set model URL for Ollama models
-        if is_ollama_model and not model_url.strip():
+        if is_ollama_model and (not model_url or not model_url.strip()):
             model_url = "http://localhost:11434"
 
         # Configure parameters based on model type
@@ -188,7 +188,7 @@ def run_extraction(
         if is_ollama_model:
             # Ollama-specific settings
             extract_kwargs.update({
-                "model_url": model_url.strip(),
+                "model_url": model_url.strip() if model_url else "http://localhost:11434",
                 "fence_output": False,  # Ollama works better without fencing
                 "use_schema_constraints": False  # Ollama doesn't support schema constraints
             })
@@ -394,7 +394,7 @@ def process_uploaded_file(file) -> tuple[str, str]:
 
 def test_ollama_connection(model_url: str) -> str:
     """Test connection to Ollama server and return status."""
-    if not model_url.strip():
+    if not model_url or not model_url.strip():
         model_url = "http://localhost:11434"
     
     try:
