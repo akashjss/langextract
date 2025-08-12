@@ -33,6 +33,7 @@ Experience LangExtract through an intuitive web interface! Our Gradio-powered UI
 - 🎯 **Drag & Drop**: Upload PDFs, DOCX, and text files
 - 🤖 **Multi-Model**: Support for Gemini, OpenAI, and 20+ Ollama models
 - 🔒 **Privacy-First**: Use local Ollama models for complete data privacy
+- 🤖 **AI Example Generation**: Automatically generate domain-specific examples using your selected model
 - 📊 **Interactive Visualization**: Real-time extraction results
 - 📁 **Document Processing**: Automatic text extraction from various formats
 
@@ -41,14 +42,14 @@ Experience LangExtract through an intuitive web interface! Our Gradio-powered UI
 Get started with the visual interface in under 2 minutes:
 
 ```bash
-# 1. Create and activate virtual environment
-python -m venv langextract_env
-source langextract_env/bin/activate  # On Windows: langextract_env\Scripts\activate
-
-# 2. Clone and install LangExtract
-git clone https://github.com/google/langextract.git
+# 1. Clone and install LangExtract
+git clone git@github.com:akashjss/langextract-ui.git
 cd langextract
 pip install -r requirements.txt
+
+# 2. Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # 3. Launch the web interface
 python launch_gradio.py
@@ -60,7 +61,9 @@ python launch_gradio.py
 - **Cloud Models**: Get one from [AI Studio](https://aistudio.google.com/app/apikey) for Gemini
 - **Local Models**: Install [Ollama](https://ollama.com/) and run `ollama pull gemma2:2b` for privacy-first extraction
 
-**💡 Tip**: Try the example templates (Romeo & Juliet, Medical, Business) to see LangExtract in action!
+**💡 Tips**:
+- Try the example templates (Romeo & Juliet, Medical, Business) to see LangExtract in action!
+- Use the **🤖 Generate AI Example** button to create custom examples for your specific domain (medical, legal, business, etc.)
 
 
 ## Table of Contents
@@ -92,7 +95,7 @@ LangExtract is a Python library that uses LLMs to extract structured information
 3.  **Optimized for Long Documents:** Overcomes the "needle-in-a-haystack" challenge of large document extraction by using an optimized strategy of text chunking, parallel processing, and multiple passes for higher recall.
 4.  **Interactive Visualization:** Instantly generates a self-contained, interactive HTML file to visualize and review thousands of extracted entities in their original context.
 5.  **Flexible LLM Support:** Supports your preferred models, from cloud-based LLMs like the Google Gemini family to local open-source models via the built-in Ollama interface.
-6.  **Adaptable to Any Domain:** Define extraction tasks for any domain using just a few examples. LangExtract adapts to your needs without requiring any model fine-tuning.
+6.  **Adaptable to Any Domain:** Define extraction tasks for any domain using just a few examples or AI-generated examples. LangExtract adapts to your needs without requiring any model fine-tuning.
 7.  **Leverages LLM World Knowledge:** Utilize precise prompt wording and few-shot examples to influence how the extraction task may utilize LLM knowledge. The accuracy of any inferred information and its adherence to the task specification are contingent upon the selected LLM, the complexity of the task, the clarity of the prompt instructions, and the nature of the prompt examples.
 
 ## Quick Start
@@ -103,7 +106,7 @@ Extract structured information with just a few lines of code.
 
 ### 1. Define Your Extraction Task
 
-First, create a prompt that clearly describes what you want to extract. Then, provide a high-quality example to guide the model.
+First, create a prompt that clearly describes what you want to extract. Then, provide a high-quality example to guide the model. You can create examples manually or use the **🤖 AI Example Generation** feature in the Gradio web interface to automatically generate domain-specific examples.
 
 ```python
 import langextract as lx

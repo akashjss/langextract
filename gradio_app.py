@@ -295,6 +295,142 @@ Extractions:
 ---"""
 
 
+def generate_ai_example(
+    prompt_description: str,
+    model_id: str,
+    api_key: str,
+    model_url: str,
+    domain_hint: str = ""
+) -> str:
+    """Generate an example using AI based on the prompt description."""
+
+    if not prompt_description or not prompt_description.strip():
+        return "Error: Please provide a prompt description first to generate an example."
+
+    if not model_id or not model_id.strip():
+        return "Error: Please select a model first."
+
+    try:
+        # Detect if this is an Ollama model
+        ollama_patterns = [
+            'gemma', 'llama', 'mistral', 'mixtral', 'phi', 'qwen',
+            'deepseek', 'command-r', 'starcoder', 'codellama',
+            'codegemma', 'tinyllama', 'wizardcoder'
+        ]
+        is_ollama_model = any(pattern in model_id.lower() for pattern in ollama_patterns)
+
+        # Check API key for cloud models
+        if not is_ollama_model:
+            if not api_key or not api_key.strip():
+                if 'LANGEXTRACT_API_KEY' not in os.environ:
+                    return "Error: Please provide an API key for cloud models or select an Ollama model."
+            else:
+                os.environ['LANGEXTRACT_API_KEY'] = api_key.strip()
+
+        # Set model URL for Ollama
+        if is_ollama_model and (not model_url or not model_url.strip()):
+            model_url = "http://localhost:11434"
+
+        # Create the generation prompt
+        domain_context = f" in the {domain_hint} domain" if domain_hint else ""
+
+        generation_prompt = f"""You are helping create training examples for an information extraction system.
+
+Task: {prompt_description}
+
+Generate a high-quality example{domain_context} that demonstrates the extraction task. The example should:
+1. Include realistic, natural text (2-3 sentences)
+2. Show clear, non-overlapping extractions
+3. Use exact text spans from the input
+4. Include meaningful attributes that add context
+5. Follow this exact format:
+
+---
+Text: [Your realistic example text here]
+
+Extractions:
+- class: entity_type, text: exact text span, attributes: {{"key": "value"}}
+- class: another_type, text: another exact span, attributes: {{"key2": "value2"}}
+---
+
+Make the text realistic and the extractions clear and useful. Focus on quality over quantity - 2-4 extractions is perfect."""
+
+        # Use langextract to generate the example
+        extract_kwargs = {
+            "text_or_documents": generation_prompt,
+            "prompt_description": "Extract the generated example from the text, returning just the example in the exact format shown.",
+            "examples": [lx.data.ExampleData(
+                text="You are helping create training examples for an information extraction system. Generate a medical example: ---\nText: Patient was prescribed Lisinopril 10mg daily for hypertension.\n\nExtractions:\n- class: medication, text: Lisinopril, attributes: {\"dosage\": \"10mg\", \"frequency\": \"daily\"}\n- class: condition, text: hypertension, attributes: {\"type\": \"cardiovascular\"}\n---",
+                extractions=[lx.data.Extraction(
+                    extraction_class="example",
+                    extraction_text="---\nText: Patient was prescribed Lisinopril 10mg daily for hypertension.\n\nExtractions:\n- class: medication, text: Lisinopril, attributes: {\"dosage\": \"10mg\", \"frequency\": \"daily\"}\n- class: condition, text: hypertension, attributes: {\"type\": \"cardiovascular\"}\n---",
+                    attributes={"format": "langextract_example"}
+                )]
+            )],
+            "model_id": model_id,
+            "temperature": 0.7,
+            "max_char_buffer": 2000,
+            "extraction_passes": 1,
+            "max_workers": 1,
+            "debug": False
+        }
+
+        if is_ollama_model:
+            extract_kwargs.update({
+                "model_url": model_url.strip() if model_url else "http://localhost:11434",
+                "fence_output": False,
+                "use_schema_constraints": False
+            })
+        else:
+            extract_kwargs.update({
+                "use_schema_constraints": True,
+                "fence_output": False
+            })
+
+            # OpenAI models need specific settings
+            if model_id.startswith('gpt-'):
+                extract_kwargs.update({
+                    "fence_output": True,
+                    "use_schema_constraints": False
+                })
+
+        # Generate the example
+        result = lx.extract(**extract_kwargs)
+
+        if result.extractions:
+            # Try to find the generated example
+            generated_text = result.extractions[0].extraction_text
+
+            # If the model returned the example properly formatted, use it
+            if "---" in generated_text and "Text:" in generated_text and "Extractions:" in generated_text:
+                return generated_text
+            else:
+                # Fallback: create a simple example based on the generation prompt
+                return f"""---
+Text: [AI-generated example for: {prompt_description[:100]}...]
+
+Extractions:
+- class: example_entity, text: sample_text, attributes: {{"note": "AI generation failed, please create manual example"}}
+---
+
+Note: The AI model had difficulty generating a proper example. Please create one manually or try a different model."""
+        else:
+            return f"""---
+Text: [Please create an example for: {prompt_description[:100]}...]
+
+Extractions:
+- class: example_entity, text: sample_text, attributes: {{"note": "Please fill in manually"}}
+---
+
+Note: No example was generated. Please create one manually."""
+
+    except Exception as e:
+        error_msg = f"Error generating example: {str(e)}"
+        if "connection" in str(e).lower() and is_ollama_model:
+            error_msg += "\n\nNote: Make sure Ollama is running with: ollama serve"
+        return error_msg
+
+
 def extract_text_from_pdf(file_path: str) -> str:
     """Extract text from a PDF file."""
     if not PDF_SUPPORT:
@@ -527,6 +663,27 @@ def create_gradio_interface():
                         example_medical_btn = gr.Button("🏥 Medical", size="sm")
                         example_business_btn = gr.Button("💼 Business", size="sm")
 
+                    gr.Markdown("**Or generate an example using AI:**")
+                    with gr.Row():
+                        domain_selector = gr.Dropdown(
+                            label="Domain (optional)",
+                            choices=[
+                                "medical", "business", "legal", "academic", "news",
+                                "literature", "technical", "scientific", "social media", "email"
+                            ],
+                            value=None,
+                            scale=2,
+                            info="Choose a domain to help AI generate relevant examples"
+                        )
+                        generate_example_btn = gr.Button("🤖 Generate AI Example", variant="secondary", scale=1)
+
+                    generation_status = gr.Textbox(
+                        label="Generation Status",
+                        lines=2,
+                        interactive=False,
+                        visible=False
+                    )
+
                     examples_text = gr.Textbox(
                         label="Examples",
                         placeholder="""---
@@ -547,33 +704,36 @@ Extractions:
                         label="Model",
                         choices=[
                             # Cloud models (require API key)
-                            "gemini-2.5-flash",
-                            "gemini-2.5-pro",
-                            "gemini-1.5-flash",
-                            "gemini-1.5-pro",
-                            "gpt-4o",
-                            "gpt-4o-mini",
+                            ("☁️ Gemini 2.5 Flash (Google Cloud)", "gemini-2.5-flash"),
+                            ("☁️ Gemini 2.5 Pro (Google Cloud)", "gemini-2.5-pro"),
+                            ("☁️ Gemini 1.5 Flash (Google Cloud)", "gemini-1.5-flash"),
+                            ("☁️ Gemini 1.5 Pro (Google Cloud)", "gemini-1.5-pro"),
+                            ("☁️ GPT-4o (OpenAI)", "gpt-4o"),
+                            ("☁️ GPT-4o Mini (OpenAI)", "gpt-4o-mini"),
                             # Local Ollama models (no API key needed)
-                            "gemma2:2b",
-                            "gemma2:9b",
-                            "gemma2:27b",
-                            "llama3.2:1b",
-                            "llama3.2:3b",
-                            "llama3.1:8b",
-                            "llama3.1:70b",
-                            "mistral:7b",
-                            "mistral-nemo:12b",
-                            "mixtral:8x7b",
-                            "phi3:mini",
-                            "qwen2.5:7b",
-                            "qwen2.5:14b",
-                            "deepseek-r1:8b",
-                            "codellama:7b",
-                            "codegemma:2b",
-                            "tinyllama:1.1b"
+                            ("🌐 Gemma2 2B (Ollama)", "gemma2:2b"),
+                            ("🌐 Gemma2 9B (Ollama)", "gemma2:9b"),
+                            ("🌐 Gemma2 27B (Ollama)", "gemma2:27b"),
+                            ("🌐 Llama 3.2 1B (Ollama)", "llama3.2:1b"),
+                            ("🌐 Llama 3.2 3B (Ollama)", "llama3.2:3b"),
+                            ("🌐 Llama 3.1 8B (Ollama)", "llama3.1:8b"),
+                            ("🌐 Llama 3.1 70B (Ollama)", "llama3.1:70b"),
+                            ("🌐 Mistral 7B (Ollama)", "mistral:7b"),
+                            ("🌐 Mistral Nemo 12B (Ollama)", "mistral-nemo:12b"),
+                            ("🌐 Mixtral 8x7B (Ollama)", "mixtral:8x7b"),
+                            ("🌐 Phi3 Mini (Ollama)", "phi3:mini"),
+                            ("🌐 Qwen2.5 7B (Ollama)", "qwen2.5:7b"),
+                            ("🌐 Qwen2.5 14B (Ollama)", "qwen2.5:14b"),
+                            ("🌐 DeepSeek R1 8B (Ollama)", "deepseek-r1:8b"),
+                            ("🌐 CodeLlama 7B (Ollama)", "codellama:7b"),
+                            ("🌐 CodeGemma 2B (Ollama)", "codegemma:2b"),
+                            ("🌐 Command R (Ollama)", "command-r"),
+                            ("🌐 StarCoder (Ollama)", "starcoder"),
+                            ("🌐 WizardCoder (Ollama)", "wizardcoder"),
+                            ("🌐 TinyLlama 1.1B (Ollama)", "tinyllama:1.1b")
                         ],
                         value="gemini-2.5-flash",
-                        info="Choose your model. Gemini for cloud, local models (gemma2, llama, etc.) for privacy."
+                        info="☁️ Cloud models require API keys. 🌐 Ollama models run locally with no API key needed."
                     )
 
                     api_key = gr.Textbox(
@@ -708,7 +868,9 @@ Extractions:
             - Specify extraction order if important
 
             ### 3. Provide Examples
-            Examples are **required** and guide the model. Format:
+            Examples are **required** and guide the model. You can:
+
+            **📝 Create manually** using this format:
             ```
             ---
             Text: Your example text here
@@ -718,6 +880,8 @@ Extractions:
             - class: another_type, text: another span, attributes: {"key2": "value2"}
             ---
             ```
+
+            **🤖 Generate with AI**: Use the "Generate AI Example" button to have your selected model create examples based on your prompt description. You can optionally specify a domain (medical, business, etc.) for more relevant examples.
 
             ### 4. Choose Model & Settings
             - **Gemini models**: Best for structured extraction with schema constraints
@@ -735,6 +899,7 @@ Extractions:
             - Include meaningful attributes that add context
             - For long documents, consider multiple extraction passes
             - Smaller chunks (max_char_buffer) often give better accuracy
+            - **🤖 AI Example Generation**: Use the "Generate AI Example" button to quickly create domain-specific examples. Review and edit AI-generated examples before using them for extraction.
 
             ## Model Comparison
 
@@ -816,6 +981,42 @@ Extractions:
         example_business_btn.click(
             fn=get_example_business,
             outputs=examples_text
+        )
+
+        def handle_generate_example(prompt_desc, model, api_key_val, model_url_val, domain):
+            """Handle AI example generation with status updates."""
+            if not prompt_desc or not prompt_desc.strip():
+                return "", gr.update(value="❌ Please provide a prompt description first.", visible=True)
+
+            if not model or not model.strip():
+                return "", gr.update(value="❌ Please select a model in the Model Settings tab.", visible=True)
+
+            # Show generation status
+            status_msg = f"🤖 Generating example using {model}..."
+            if domain:
+                status_msg += f" (Domain: {domain})"
+
+            try:
+                generated_example = generate_ai_example(
+                    prompt_description=prompt_desc,
+                    model_id=model,
+                    api_key=api_key_val,
+                    model_url=model_url_val,
+                    domain_hint=domain or ""
+                )
+
+                if generated_example.startswith("Error:"):
+                    return "", gr.update(value=f"❌ {generated_example}", visible=True)
+                else:
+                    return generated_example, gr.update(value="✅ Example generated successfully! Review and edit as needed.", visible=True)
+
+            except Exception as e:
+                return "", gr.update(value=f"❌ Generation failed: {str(e)}", visible=True)
+
+        generate_example_btn.click(
+            fn=handle_generate_example,
+            inputs=[prompt_description, model_id, api_key, model_url, domain_selector],
+            outputs=[examples_text, generation_status]
         )
 
         def test_and_show_ollama(url):
