@@ -31,10 +31,36 @@ Experience LangExtract through an intuitive web interface! Our Gradio-powered UI
 
 **✨ Key Features:**
 - 🎯 **Drag & Drop**: Upload PDFs, DOCX, and text files
-- 🤖 **Multi-Model**: Support for Gemini, OpenAI, and 20+ Ollama models  
+- 🤖 **Multi-Model**: Support for Gemini, OpenAI, and 20+ Ollama models
 - 🔒 **Privacy-First**: Use local Ollama models for complete data privacy
 - 📊 **Interactive Visualization**: Real-time extraction results
 - 📁 **Document Processing**: Automatic text extraction from various formats
+
+### 🚀 Quick Start with Gradio Web Interface
+
+Get started with the visual interface in under 2 minutes:
+
+```bash
+# 1. Create and activate virtual environment
+python -m venv langextract_env
+source langextract_env/bin/activate  # On Windows: langextract_env\Scripts\activate
+
+# 2. Clone and install LangExtract
+git clone https://github.com/google/langextract.git
+cd langextract
+pip install -r requirements.txt
+
+# 3. Launch the web interface
+python launch_gradio.py
+```
+
+**🌐 Open your browser to `http://localhost:7860`** and start extracting!
+
+**🔑 Need an API Key?**
+- **Cloud Models**: Get one from [AI Studio](https://aistudio.google.com/app/apikey) for Gemini
+- **Local Models**: Install [Ollama](https://ollama.com/) and run `ollama pull gemma2:2b` for privacy-first extraction
+
+**💡 Tip**: Try the example templates (Romeo & Juliet, Medical, Business) to see LangExtract in action!
 
 
 ## Table of Contents
