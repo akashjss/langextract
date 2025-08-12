@@ -12,6 +12,9 @@ import os
 import tempfile
 import traceback
 from typing import Dict, List, Optional, Tuple
+import pathlib
+import uuid
+from datetime import datetime
 
 import gradio as gr
 import requests
@@ -134,24 +137,24 @@ def run_extraction(
     max_workers: int,
     use_schema_constraints: bool,
     fence_output: bool
-) -> Tuple[str, str, str]:
+) -> Tuple[str, str, str, str, str]:
     """Run the extraction and return results."""
 
     if not input_text or not input_text.strip():
-        return "Error: Please provide input text", "", ""
+        return "Error: Please provide input text", "", "", "", ""
 
     if not prompt_description or not prompt_description.strip():
-        return "Error: Please provide a prompt description", "", ""
+        return "Error: Please provide a prompt description", "", "", "", ""
 
     if not examples_text or not examples_text.strip():
-        return "Error: Please provide at least one example", "", ""
+        return "Error: Please provide at least one example", "", "", "", ""
 
     try:
         # Parse examples
         examples = parse_examples_from_text(examples_text)
 
         if not examples:
-            return "Error: Could not parse examples. Please check the format.", "", ""
+            return "Error: Could not parse examples. Please check the format.", "", "", "", ""
 
         # Detect if this is an Ollama model (local model)
         ollama_patterns = [
@@ -166,7 +169,7 @@ def run_extraction(
             if api_key and api_key.strip():
                 os.environ['LANGEXTRACT_API_KEY'] = api_key.strip()
             elif 'LANGEXTRACT_API_KEY' not in os.environ:
-                return "Error: Please provide an API key for cloud models (Gemini/OpenAI) or use a local Ollama model", "", ""
+                return "Error: Please provide an API key for cloud models (Gemini/OpenAI) or use a local Ollama model", "", "", "", ""
 
         # Set model URL for Ollama models
         if is_ollama_model and (not model_url or not model_url.strip()):
@@ -248,14 +251,24 @@ def run_extraction(
             else:
                 summary += f"API provider: {'OpenAI' if model_id.startswith('gpt-') else 'Google Gemini'}"
 
-            return summary, results_text, visualization
+            # Create download files
+            try:
+                jsonl_file_path = save_results_as_jsonl(result)
+                html_file_path = create_html_visualization(result)
+                download_status = f"✅ Files ready for download!\n📄 JSONL: {os.path.basename(jsonl_file_path)}\n🌐 HTML: {os.path.basename(html_file_path)}"
+            except Exception as download_error:
+                jsonl_file_path = ""
+                html_file_path = ""
+                download_status = f"⚠️ Downloads failed: {str(download_error)}"
+
+            return summary, results_text, visualization, jsonl_file_path, html_file_path
         else:
-            return "No extractions found", "[]", "<p>No extractions to visualize</p>"
+            return "No extractions found", "[]", "<p>No extractions to visualize</p>", "", ""
 
     except Exception as e:
         error_msg = f"Error during extraction: {str(e)}\n\n"
         error_msg += f"Traceback:\n{traceback.format_exc()}"
-        return error_msg, "", ""
+        return error_msg, "", "", "", ""
 
 
 def get_example_romeo_juliet():
@@ -526,6 +539,127 @@ def process_uploaded_file(file) -> tuple[str, str]:
 
     except Exception as e:
         return "", f"Error processing file: {str(e)}"
+
+
+def save_results_as_jsonl(result: lx.data.AnnotatedDocument, filename: str = None) -> str:
+    """Save extraction results as JSONL file and return the file path."""
+    try:
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"extraction_results_{timestamp}.jsonl"
+
+        # Create a temporary directory for downloads
+        download_dir = pathlib.Path("downloads")
+        download_dir.mkdir(exist_ok=True)
+
+        output_path = download_dir / filename
+
+        # Save the annotated document
+        lx.io.save_annotated_documents(
+            [result],
+            output_dir=download_dir,
+            output_name=filename,
+            show_progress=False
+        )
+
+        return str(output_path)
+    except Exception as e:
+        raise Exception(f"Failed to save JSONL file: {str(e)}")
+
+
+def create_html_visualization(result: lx.data.AnnotatedDocument, filename: str = None) -> str:
+    """Create HTML visualization from extraction results and return the file path."""
+    try:
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"visualization_{timestamp}.html"
+
+        # Create a temporary directory for downloads
+        download_dir = pathlib.Path("downloads")
+        download_dir.mkdir(exist_ok=True)
+
+        output_path = download_dir / filename
+
+        # Generate visualization HTML
+        html_content = lx.visualize(result)
+
+        # If it's an IPython HTML object, get the data
+        if hasattr(html_content, 'data'):
+            html_content = html_content.data
+        elif not isinstance(html_content, str):
+            html_content = str(html_content)
+
+        # Write to file
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+
+        return str(output_path)
+    except Exception as e:
+        raise Exception(f"Failed to create HTML visualization: {str(e)}")
+
+
+def load_jsonl_and_visualize(jsonl_file_path: str) -> Tuple[str, str, str]:
+    """Load JSONL file and create visualization."""
+    try:
+        if not jsonl_file_path or not os.path.exists(jsonl_file_path):
+            return "Error: No valid JSONL file provided", "", ""
+
+        # Load the annotated documents
+        documents = list(lx.io.load_annotated_documents_jsonl(
+            pathlib.Path(jsonl_file_path),
+            show_progress=False
+        ))
+
+        if not documents:
+            return "Error: No documents found in JSONL file", "", ""
+
+        # Use the first document
+        result = documents[0]
+
+        if not result.extractions:
+            return "Error: No extractions found in the document", "", ""
+
+        # Create JSON output for display
+        extractions_json = []
+        for extraction in result.extractions:
+            extraction_dict = {
+                "extraction_class": extraction.extraction_class,
+                "extraction_text": extraction.extraction_text,
+                "attributes": extraction.attributes,
+            }
+            if extraction.char_interval:
+                extraction_dict["char_interval"] = {
+                    "start_pos": extraction.char_interval.start_pos,
+                    "end_pos": extraction.char_interval.end_pos
+                }
+            extractions_json.append(extraction_dict)
+
+        results_text = json.dumps(extractions_json, indent=2)
+
+        # Create visualization
+        try:
+            viz_html = lx.visualize(result)
+            if isinstance(viz_html, str):
+                visualization = viz_html
+            else:
+                # If it's an IPython HTML object, get the data
+                visualization = str(viz_html.data) if hasattr(viz_html, 'data') else str(viz_html)
+        except Exception as viz_error:
+            visualization = f"<p>Visualization error: {str(viz_error)}</p>"
+
+        # Summary
+        filename = os.path.basename(jsonl_file_path)
+        summary = f"✅ Successfully loaded JSONL file: {filename}\n"
+        summary += f"Found {len(result.extractions)} extractions\n"
+        summary += f"Text length: {len(result.text) if result.text else 0} characters\n"
+        summary += f"Document ID: {result.document_id}"
+
+        return summary, results_text, visualization
+
+    except Exception as e:
+        error_msg = f"Error loading JSONL file: {str(e)}\n\n"
+        error_msg += f"Traceback:\n{traceback.format_exc()}"
+        return error_msg, "", ""
 
 
 def test_ollama_connection(model_url: str) -> str:
@@ -842,6 +976,71 @@ Extractions:
                         label="Visualization"
                     )
 
+            gr.Markdown("### 📥 Download Results")
+            with gr.Row():
+                jsonl_download = gr.File(
+                    label="📄 Download JSONL File",
+                    visible=False
+                )
+                html_download = gr.File(
+                    label="🌐 Download HTML Visualization",
+                    visible=False
+                )
+
+        with gr.Tab("📊 Visualization Studio"):
+            gr.Markdown("""
+            ## 📊 Visualization Studio
+
+            Upload an existing JSONL file from previous extractions to generate interactive visualizations.
+            You can also create standalone HTML files for sharing and offline viewing.
+            """)
+
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Markdown("### 📁 Upload JSONL File")
+
+                    jsonl_file_upload = gr.File(
+                        label="📄 Upload JSONL File",
+                        file_types=[".jsonl"],
+                        type="filepath"
+                    )
+
+                    load_viz_btn = gr.Button(
+                        "🔍 Load & Visualize",
+                        variant="primary",
+                        size="lg"
+                    )
+
+                    viz_summary_output = gr.Textbox(
+                        label="Summary",
+                        lines=4,
+                        interactive=False
+                    )
+
+                with gr.Column(scale=2):
+                    gr.Markdown("### 🌐 Generated Visualization")
+
+                    viz_display_output = gr.HTML(
+                        label="Visualization Preview"
+                    )
+
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("### 📄 Extraction Data")
+                    viz_results_output = gr.Code(
+                        label="Extractions (JSON)",
+                        language="json",
+                        lines=12
+                    )
+
+                with gr.Column():
+                    gr.Markdown("### 💾 Download Options")
+
+                    standalone_html_download = gr.File(
+                        label="📱 Download Standalone HTML",
+                        visible=False
+                    )
+
         with gr.Tab("ℹ️ Help & Examples"):
             gr.Markdown("""
             ## How to Use LangExtract
@@ -1049,8 +1248,54 @@ Extractions:
             outputs=[ollama_status, ollama_status]
         )
 
+        def handle_extraction_with_downloads(*args):
+            """Handle extraction and manage download file visibility."""
+            summary, results, visualization, jsonl_path, html_path = run_extraction(*args)
+
+            # Update download file visibility and paths
+            jsonl_visible = bool(jsonl_path and os.path.exists(jsonl_path))
+            html_visible = bool(html_path and os.path.exists(html_path))
+
+            return (
+                summary,
+                results,
+                visualization,
+                gr.update(value=jsonl_path if jsonl_visible else None, visible=jsonl_visible),
+                gr.update(value=html_path if html_visible else None, visible=html_visible)
+            )
+
+        def handle_jsonl_upload_and_visualize(jsonl_file):
+            """Handle JSONL file upload and visualization generation."""
+            if jsonl_file is None:
+                return "", "", "", gr.update(visible=False)
+
+            summary, results, visualization = load_jsonl_and_visualize(jsonl_file.name)
+
+            # Create standalone HTML file if visualization was successful
+            html_path = ""
+            if not summary.startswith("Error:"):
+                try:
+                    # Load the document again to create HTML file
+                    documents = list(lx.io.load_annotated_documents_jsonl(
+                        pathlib.Path(jsonl_file.name),
+                        show_progress=False
+                    ))
+                    if documents:
+                        html_path = create_html_visualization(documents[0])
+                except Exception as e:
+                    print(f"Warning: Could not create HTML download: {e}")
+
+            html_visible = bool(html_path and os.path.exists(html_path))
+
+            return (
+                summary,
+                results,
+                visualization,
+                gr.update(value=html_path if html_visible else None, visible=html_visible)
+            )
+
         extract_btn.click(
-            fn=run_extraction,
+            fn=handle_extraction_with_downloads,
             inputs=[
                 input_text,
                 prompt_description,
@@ -1065,7 +1310,13 @@ Extractions:
                 use_schema_constraints,
                 fence_output
             ],
-            outputs=[summary_output, results_output, visualization_output]
+            outputs=[summary_output, results_output, visualization_output, jsonl_download, html_download]
+        )
+
+        load_viz_btn.click(
+            fn=handle_jsonl_upload_and_visualize,
+            inputs=[jsonl_file_upload],
+            outputs=[viz_summary_output, viz_results_output, viz_display_output, standalone_html_download]
         )
 
     return interface
